@@ -1,102 +1,82 @@
 #!/bin/bash
 
-# -----------------------------------------------------------------------------
-# OPENSUSE CONSOLE SCRIPT - INTERACTIVE ACTION SELECTION (POSITIONAL ARGS)
-#
 # Usage: ./menu_script.sh <USERNAME> <CELL_NAME>
-# -----------------------------------------------------------------------------
-
-# --- Configuration ---
 
 USERNAME="$1"
 CELL_NAME="$2"
 
-# Main menu options
-ACTIONS=("basic checks" "runprio1" "runprio2" "ckresults" "Exit Menu")
+ACTIONS=("basic checks" "runprio1" "runprio2" "ckresults")
+PREVIOUSLY_EXECUTED=""
 
 # --- Argument Validation ---
-
 if [ -z "$USERNAME" ] || [ -z "$CELL_NAME" ]; then
     echo "ERROR: Missing required arguments." >&2
     echo "Usage: $0 <USERNAME> <CELL_NAME>"
     exit 1
 fi
 
-# --- Menu and Execution ---
+echo ""
+echo "=== Console Management Script ==="
+echo "  USER: $USERNAME"
+echo "  CELL ID: $CELL_NAME"
+echo "================================="
+echo ""
 
-echo "--- Console Management Script ---"
-echo "CELL ID: $CELL_NAME"
-echo "USER: $USERNAME"
-echo "-------------------------------"
-
-# Store original IFS and set it to newline ('\n') to force vertical listing of choices
-OLD_IFS=$IFS
-IFS=$'\n'
-
-# Outer loop for main menu
 PS3="Main Menu > "
+
 select CHOICE in "${ACTIONS[@]}"; do
+    ACTION_LABEL=""
+    ACTUAL_COMMAND=""
+    
+    # === Action Mapping ===
     case $CHOICE in
         "basic checks")
-            echo -e "\n--- Submenu: Basic Checks ---"
-            # Submenu options
+            echo -e "\n=== Basic Checks ==="
             CHECKS=("LVS" "GDS" "RGPA" "Back to Main Menu")
             
-            # Temporarily change prompt for submenu
             OLD_PS3=$PS3
             PS3="Basic Checks > "
             
-            # The inner select loop inherits the vertical IFS setting
             select CHECK in "${CHECKS[@]}"; do
                 case $CHECK in
                     "LVS")
-                        ACTION_LABEL="Basic Check: LVS"
-                        # Assumed alias: check_lvs
+                        ACTION_LABEL="LVS"
                         ACTUAL_COMMAND="check_lvs $USERNAME $CELL_NAME"
-                        # Break inner loop to proceed to execution block
                         break
                         ;;
                     "GDS")
-                        ACTION_LABEL="Basic Check: GDS"
-                        # Assumed alias: check_gds
+                        ACTION_LABEL="GDS"
                         ACTUAL_COMMAND="check_gds $USERNAME $CELL_NAME"
                         break
                         ;;
                     "RGPA")
-                        ACTION_LABEL="Basic Check: RGPA"
-                        # Assumed alias: check_rgpa
+                        ACTION_LABEL="RGPA"
                         ACTUAL_COMMAND="check_rgpa $USERNAME $CELL_NAME"
                         break
                         ;;
                     "Back to Main Menu")
                         echo "Returning to main menu..."
-                        # Restore main prompt and skip to next iteration of OUTER loop
                         PS3=$OLD_PS3
-                        continue 2
+                        continue 2 # Exit inner select and continue outer loop
                         ;;
                     *)
                         echo "Invalid selection. Please try again."
                         ;;
                 esac
             done
-            # Restore PS3 if we broke out of inner loop normally
             PS3=$OLD_PS3
             ;;
         "runprio1")
-            ACTION_LABEL="Run Prio 1 Deployment"
+            ACTION_LABEL="runprio1"
             ACTUAL_COMMAND="runprio1 $USERNAME $CELL_NAME"
             ;;
         "runprio2")
-            ACTION_LABEL="Run Prio 2 Deployment"
+            ACTION_LABEL="runprio2"
             ACTUAL_COMMAND="runprio2 $USERNAME $CELL_NAME"
             ;;
         "ckresults")
-            ACTION_LABEL="Check Results"
+            ACTION_LABEL="ckresults"
             ACTUAL_COMMAND="ckresults $USERNAME $CELL_NAME"
-            ;;
-        "Exit Menu")
-            echo "Exiting script. Goodbye!"
-            break
             ;;
         *)
             echo "Invalid selection. Please enter a number from the list."
@@ -104,19 +84,44 @@ select CHOICE in "${ACTIONS[@]}"; do
             ;;
     esac
 
-    # --- Execution Block (Safety Locked: Shared by all valid selections) ---
-    echo -e "\n-> Preparing execution for ACTION: $ACTION_LABEL"
-    echo "-> Executing command in simulation mode (ECHO ONLY):"
-    echo "   $ACTUAL_COMMAND"
-    echo ""
-    
-    # $ACTUAL_COMMAND  # THIS LINE REMAINS COMMENTED OUT TO PREVENT ACTUAL EXECUTION
-    
-    echo "SIMULATION COMPLETE: The command was printed but not executed."
-    echo "-------------------------------"
-done
+    # --- Execution and History Block ---
+    if [ -n "$ACTION_LABEL" ]; then
+        echo -e "\n-> Preparing execution for ACTION: $ACTION_LABEL"
+        echo "-> Command to execute:"
+        echo "   $ACTUAL_COMMAND"
+        echo ""
+        
+        # Confirmation Prompt
+        read -r -p "Confirm execution? (y/N): " CONFIRMATION
+        
+        if [[ "$CONFIRMATION" =~ ^[Yy]$ ]]; then
+            echo "Execution confirmed. Proceeding..."
+            
+            # --- Actual Command Execution ---
+            # Uncomment the line below to execute the command.
+            # $ACTUAL_COMMAND
+	    echo ""
+            # --- Simulation Block ---
+            if [ $? -eq 0 ]; then
+                echo "SUCCESS: Command execution simulated/completed."
+                
+                if [ -n "$PREVIOUSLY_EXECUTED" ]; then
+                    PREVIOUSLY_EXECUTED="$PREVIOUSLY_EXECUTED, $ACTION_LABEL"
+                else
+                    PREVIOUSLY_EXECUTED="$ACTION_LABEL"
+                fi
+            else
+                echo "FAILURE: Command encountered an error."
+            fi
+            
+        else
+            echo "Execution cancelled by user."
+        fi
 
-# Restore original IFS before exiting the script environment
-IFS=$OLD_IFS
-
-echo ""
+        echo ""
+        echo "================================"
+        echo "PREVIOUSLY EXECUTED: [ $PREVIOUSLY_EXECUTED ]"
+        echo "================================"
+        
+    fi
+done	
